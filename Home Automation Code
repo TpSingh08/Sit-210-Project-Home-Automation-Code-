@@ -1,0 +1,220 @@
+// Code for Arduino UNO
+#include <Servo.h>
+
+#define trigPin 9
+
+#define echoPin 8
+
+Servo servo;
+
+int sound = 250;
+
+void setup() {
+
+  Serial.begin (9600);
+
+  pinMode(trigPin, OUTPUT);
+
+  pinMode(echoPin, INPUT);
+
+  servo.attach(6);
+
+}
+
+void loop() {
+
+  long duration, distance;
+
+  digitalWrite(trigPin, LOW);
+
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+
+  distance = (duration / 2) / 29.1;
+  if (distance > 5) {
+
+    Serial.print(distance);
+
+    Serial.println(" cm");
+
+    servo.write(90);
+
+  }
+
+  else if (distance < 10) {
+
+    Serial.print(distance);
+
+    Serial.println(" cm");
+
+    servo.write(180);
+  }
+
+  else {
+
+    Serial.println("The distance is more than 180cm");
+
+  }
+
+  delay(500);
+
+}
+
+
+// Code for Raspberry Pi 4
+import RPi.GPIO as GPIO
+import time
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+TRIG = 18
+ECHO = 24
+buzzer = 3
+led = 2
+
+print(" Distance Measurement in progress")
+
+GPIO.setup(TRIG,GPIO.OUT)
+GPIO.setup(ECHO,GPIO.IN)
+GPIO.setup(led,GPIO.OUT)
+GPIO.setup(buzzer,GPIO.OUT)
+
+
+
+while True:
+    GPIO.output(TRIG, False)
+
+    time.sleep(1)
+
+    GPIO.output(TRIG, True)
+    time.sleep(0.01)
+    GPIO.output(TRIG, False)
+
+    while GPIO.input(ECHO)==0:
+        pulse_start=time.time()
+
+    while GPIO.input(ECHO)==1:
+        pulse_end=time.time()
+
+    pulse_duration=pulse_end-pulse_start
+
+    distance = pulse_duration*11150
+    distance = round(distance,2)
+
+    if distance < 5:
+        GPIO.output(buzzer, GPIO.HIGH)
+        GPIO.output(led, GPIO.HIGH)
+        print("BUZZER ON/LED OFF")
+    else:
+        print("BUZZER OFF/LED ON")
+        GPIO.output(buzzer, GPIO.LOW)
+        GPIO.output(led, GPIO.LOW)
+
+
+
+// For I2C Communication
+
+// Master Code Python for Raspberry Pi
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Raspberry Pi to Arduino I2C Communication
+#i2cdetect -y 1
+
+#library
+import sys
+import smbus2 as smbus#,smbus2
+import time
+
+# Slave Addresses
+I2C_SLAVE_ADDRESS = 11 #0x0b ou 11
+I2C_SLAVE2_ADDRESS = 12
+I2C_SLAVE3_ADDRESS = 13
+
+# This function converts a string to an array of bytes.
+def ConvertStringsToBytes(src):
+  converted = []
+  for b in src:
+    converted.append(ord(b))
+  return converted
+
+def main(args):
+    # Create the I2C bus
+    I2Cbus = smbus.SMBus(1)
+    with smbus.SMBus(1) as I2Cbus:
+        slaveSelect = input("Which Arduino (1-3): ")
+        cmd = input("Enter command: ")
+
+        if slaveSelect == "1":
+            slaveAddress = I2C_SLAVE_ADDRESS
+        elif slaveSelect == "2":
+            slaveAddress = I2C_SLAVE2_ADDRESS
+        elif slaveSelect == "3":
+            slaveAddress = I2C_SLAVE3_ADDRESS
+        else:
+            # quit if you messed up
+            print(slaveSelect== "1")
+            print(type(slaveSelect))
+            print("no slave selected")
+            quit()
+        BytesToSend = ConvertStringsToBytes(cmd)
+        print("Sent " + str(slaveAddress) + " the " + str(cmd) + " command.")
+        print(BytesToSend )
+        I2Cbus.write_i2c_block_data(slaveAddress, 0x00, BytesToSend)
+        time.sleep(0.5)
+
+        while True:
+            try:
+                data=I2Cbus.read_i2c_block_data(slaveAddress,0x00,16)
+                print("recieve from slave:")
+                print(data)
+            except:
+                print("remote i/o error")
+                time.sleep(0.5)
+    return 0
+
+if __name__ == '__main__':
+     try:
+        main(sys.argv)
+     except KeyboardInterrupt:
+        print("program was stopped manually")
+     input()
+     
+     
+     
+// Slave Code for Arduino
+#include <Wire.h>
+# define I2C_SLAVE_ADDRESS 11 // 12 pour l'esclave 2 et ainsi de suite
+#define PAYLOAD_SIZE 2
+void setup()
+{
+  Wire.begin(I2C_SLAVE_ADDRESS);
+  Serial.begin(9600);
+  Serial.println("-------------------------------------I am Slave1");
+  delay(1000);
+  Wire.onRequest(requestEvents);
+  Wire.onReceive(receiveEvents);
+}
+void loop(){}
+int n = 0;
+void requestEvents()
+{
+  Serial.println(F("---> recieved request"));
+  Serial.print(F("sending value : "));
+  Serial.println(n);
+  Wire.write(n);
+}
+void receiveEvents(int numBytes)
+{
+  Serial.println(F("---> recieved events"));
+  n = Wire.read();
+  Serial.print(numBytes);
+  Serial.println(F("bytes recieved"));
+  Serial.print(F("recieved value : "));
+  Serial.println(n);
+}
